@@ -1,0 +1,12 @@
+Cus = LOAD '/user/hadoop/input/Customers.csv' USING PigStorage(',') AS (ID, Name, Age, CountryCode, Salary);
+Tran = LOAD '/user/hadoop/input/Transactions.csv' USING PigStorage(',') AS (TransID, CustID, TransTotal, TransNumItems, TransDesc);
+Cus_1 = FOREACH Cus GENERATE ID, Name;
+Tran_1 = FOREACH Tran GENERATE CustID, TransID;
+Tran_2 = GROUP Tran_1 BY CustID;
+Tran_3 = FOREACH Tran_2 GENERATE group as CustID, COUNT(Tran_1) as NumTrans;
+Tran_4 = GROUP Tran_3 ALL;
+Tran_5 = FOREACH Tran_4 GENERATE MIN(Tran_3.NumTrans) as MinNum;
+Tran_6 = FILTER Tran_3 BY NumTrans == Tran_5.MinNum;
+Cus_2 = JOIN Cus_1 BY ID, Tran_6 BY CustID parallel 40;
+Cus_3 = FOREACH Cus_2 GENERATE CustID, NumTrans;
+STORE Cus_3 INTO 'pig_output1' USING PigStorage(',');

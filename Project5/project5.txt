@@ -1,0 +1,150 @@
+Q1:
+1)
+db.createCollection(“categories”)
+db.categories.insert( { _id: "MongoDB", parent: "Databases" } )
+db.categories.insert( { _id: "dbm", parent: "Databases" } )
+db.categories.insert( { _id: "Databases", parent: "Programming" } )
+db.categories.insert( { _id: "Languages", parent: "Programming" } )
+db.categories.insert( { _id: "Programming", parent: "Books" } )
+db.categories.insert( { _id: "Books", parent: null } )
+var par = db.categories.findOne( { _id: "MongoDB" } ).parent;
+var result = [];
+var counter = 1;
+while(par != null) {
+	result.push({Name: par, Level: counter})
+	counter = counter + 1;
+	var par = db.categories.findOne( {_id: par}).parent;
+}
+result;
+2)
+
+var node = db.categories.findOne({_id: "Books"});
+
+// X should be a document _id
+function maxDepth( X ) {
+	var children = db.categories.find( {parent: X});
+	if (children.count() == 0) {
+		return 1;
+	} else {
+		var depths = [];
+		while(children.hasNext() == true) {
+			var child = children.next();
+			depths.push(maxDepth(child._id));
+		}
+		var max_depth = Math.max.apply(null, depths) + 1;
+		return max_depth;
+	}
+}
+
+maxDepth(node._id)
+
+
+3)
+db.createCollection("categories1")
+db.categories1.insert( { _id: "MongoDB", children: [] } )
+db.categories1.insert( { _id: "dbm", children: [] } )
+db.categories1.insert( { _id: "Databases", children: [ "MongoDB", "dbm" ] } )
+db.categories1.insert( { _id: "Languages", children: [] } )
+db.categories1.insert( { _id: "Programming", children: [ "Databases", "Languages" ] } )
+db.categories1.insert( { _id: "Books", children: [ "Programming" ] } )
+
+var results=[];
+var parent = db.categories1.findOne({children: "dbm"});
+while(parent){
+	print({Message: "Going up one level…"});
+	results.push(parent._id);
+	parent = db.categories1.findOne({children: parent._id});
+}
+
+results;
+
+
+4)
+var descendants = [];
+var stack = [];
+var item = db.categories1.findOne({_id: "Books"});
+stack.push(item);
+while (stack.length > 0) {
+	var current = stack.pop();
+    var children =  db.categories1.find( {_id: {$in: current.children}});
+	while (children.hasNext() == true) {
+		var child = children.next();
+		descendants.push(child._id);
+		stack.push(child);
+	}
+}
+descendants;
+
+
+5)
+
+var parentDoc = db.categories1.findOne({"children": "Databases"});
+db.categories1.find( { $and: [ {_id: {$in: parentDoc.children}}, {_id: { $ne :"Databases"}}]}, {_id:1})
+
+Q2
+
+1)
+var mapFunction1 = function(){
+var awards = this.awards;
+if(awards===undefined)
+return;
+for(var idx = 0; idx < this.awards.length; idx++){
+ var key = this.awards[idx].award;
+emit(key, 1);
+}
+
+};
+var reduceFunction1 = function(key, value){
+return Array.sum(value);
+};
+db.test.mapReduce(
+  mapFunction1,
+  reduceFunction1,
+  {out:"q1"}
+)
+db.q1.find();
+
+2)
+var res = db.test.aggregate([
+{$match:{birth:{$exists:true}}},
+{$group:{_id:{year:{$year:"$birth"}},total:{$addToSet:"$_id"}}}
+])
+res;
+
+3)
+var map = function() {
+    id = this._id;
+    emit("_id",{max:id, min:id})
+}
+var reduce = function(key, values) {
+    var min = values[0].min;
+    var max = values[0].max;
+    for ( var i=1; i<values.length; i++ ) {
+        if (min > values[i].min) {
+            min = values[i].min;
+        }
+        if (max < values[i].max) {
+            max = values[i].max;
+        }
+    }
+    return {"min":min, "max":max};
+}
+
+db.test.mapReduce(
+    map,
+    reduce,
+    {out:{q3}}
+);
+var arr = db.q3.find().toArray()
+var min = arr[0].value.min;
+var max = arr[0].value.max;
+db.test.find({_id:{$eq:min}})
+db.test.find({_id:{$eq:max}})
+
+4)
+db.test.createIndex({"awards.award": "text"})
+db.test.find({ $text: { $search: "\"Turing Award\"" } } )
+
+5)
+db.test.createIndex({"awards.award": "text"})
+db.test.find({ $text: { $search: "Turing \"National Medal\"" } } )
